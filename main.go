@@ -25,7 +25,7 @@ import (
 	sdkTrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/fermyon/github-token-monitor/providers"
+	"github.com/fermyon/auth-token-monitor/providers"
 )
 
 var timestampLayouts = []string{

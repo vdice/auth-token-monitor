@@ -9,14 +9,14 @@ Currently supported providers:
 ## GitHub
 
 ```console
-$ TOKEN=$(gh auth token) github-token-monitor --token-env-vars TOKEN
+$ TOKEN=$(gh auth token) auth-token-monitor --token-env-vars TOKEN
 Checking "TOKEN"...
 Token user login: your-github-username
 Token expiration: NONE
 Rate limit usage: 6 / 5000 (~0%)
 OAuth scopes: gist, read:org, repo, workflow
 
-$ OLD_TOKEN="<some expiring token>" github-token-monitor --token-env-vars OLD_TOKEN
+$ OLD_TOKEN="<some expiring token>" auth-token-monitor --token-env-vars OLD_TOKEN
 Checking "OLD_TOKEN"...
 Token user login: your-github-username
 Token expiration: 2025-07-09 21:27:10 +0000 UTC (9.1 days)
@@ -34,7 +34,7 @@ Here we assume `TOKEN` in the shell environment holds the value of a FwF auth to
 e.g. procured via `spin aka auth tokens create --name mytoken`:
 
 ```console
-$ ./github-token-monitor --token-env-vars TOKEN --provider fwf
+$ ./auth-token-monitor --token-env-vars TOKEN --provider fwf
 Checking "TOKEN" with provider "fwf"...
 Token expiration: 2026-02-14 00:04:38.312316 +0000 UTC (15.1 days)
 ```
@@ -54,7 +54,7 @@ jobs:
   test_token_expiration:
     runs-on: ubuntu-latest
     steps:
-      - uses: docker://ghcr.io/fermyon/github-token-monitor:latest
+      - uses: docker://ghcr.io/fermyon/auth-token-monitor:latest
         with:
           args: "--token-env-vars TEST_TOKEN"
         env:
