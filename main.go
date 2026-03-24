@@ -42,9 +42,10 @@ var flags struct {
 	TokenEnvVars []string `name:"token-env-vars" help:"Comma-separated list of token env var(s)"`
 	TokensDir    string   `name:"tokens-dir" help:"Directory containing mounted secret tokens"`
 
-	BaseURL             *url.URL           `name:"base-url" help:"Token API base URL (overrides provider default)"`
-	ExpirationThreshold time.Duration      `name:"expiration-threshold" default:"360h" help:"Minimum duration until token expiration"`
-	Provider            providers.Provider `name:"provider" type:"" default:"github" help:"Auth Token provider ('github', 'fwf', or 'linode')" `
+	BaseURL             *url.URL      `name:"base-url" help:"Token API base URL (overrides provider default)"`
+	ExpirationThreshold time.Duration `name:"expiration-threshold" default:"360h" help:"Minimum duration until token expiration"`
+	// TODO: change default to 'auto'?
+	Provider providers.Provider `name:"provider" type:"" default:"github" help:"Auth Token provider ('github', 'fwf', 'linode' or 'auto')"`
 }
 
 func main() {
@@ -152,7 +153,17 @@ func checkTokens(ctx context.Context) (err error) {
 
 	unhappyTokens := failedChecksError{}
 
-	if flags.Provider == providers.Linode {
+	if flags.Provider.Equal(&providers.Auto) {
+		for name, token := range tokens {
+			unhappy, err := checkTokensByPattern(ctx, name, token)
+			if err != nil {
+				log.Printf("Failed checking token by pattern %q: %v", name, err)
+				unhappyTokens = append(unhappyTokens, name)
+			} else {
+				unhappyTokens = append(unhappyTokens, unhappy...)
+			}
+		}
+	} else if flags.Provider.Equal(&providers.Linode) {
 		for name, token := range tokens {
 			unhappy, err := checkLinodeTokens(ctx, name, token)
 			if err != nil {
@@ -178,6 +189,29 @@ func checkTokens(ctx context.Context) (err error) {
 		return unhappyTokens
 	}
 	return nil
+}
+
+func checkTokensByPattern(ctx context.Context, name, token string) (unhappyTokens []string, err error) {
+	for _, provider := range providers.Providers {
+		for _, pattern := range provider.TokenPatterns {
+			if pattern.MatchString(token) {
+				flags.Provider = provider
+				if flags.Provider.Equal(&providers.Linode) {
+					return checkLinodeTokens(ctx, name, token)
+				} else {
+					happy, err := checkToken(ctx, name, token)
+					if err != nil {
+						log.Printf("Failed checking token %q: %v", name, err)
+					}
+					if !happy {
+						unhappyTokens = append(unhappyTokens, name)
+					}
+					return unhappyTokens, nil
+				}
+			}
+		}
+	}
+	return unhappyTokens, fmt.Errorf("could not determine provider")
 }
 
 func checkToken(ctx context.Context, name, token string) (happy bool, err error) {
@@ -267,7 +301,7 @@ func checkToken(ctx context.Context, name, token string) (happy bool, err error)
 	}
 
 	// Get GitHub token permissions (sometimes helpful when rotating)
-	if flags.Provider == providers.Github {
+	if flags.Provider.Equal(&providers.Github) {
 		oAuthScopes := resp.Header.Get("x-oauth-scopes")
 		span.SetAttributes(attribute.String("tokmon.token.oauth_scopes", oAuthScopes))
 		fmt.Printf("OAuth scopes: %s\n\n", oAuthScopes)
@@ -345,8 +379,8 @@ func request(ctx context.Context, url, token string) (resp *http.Response, body 
 	}()
 
 	var req *http.Request
-	switch flags.Provider {
-	case providers.Fwf:
+	switch {
+	case flags.Provider.Equal(&providers.Fwf):
 		body := []byte(`{}`)
 		req, err = http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 		if err != nil {

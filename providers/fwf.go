@@ -1,6 +1,9 @@
 package providers
 
-import "net/url"
+import (
+	"net/url"
+	"regexp"
+)
 
 var Fwf = Provider{
 	Name:       "fwf",
@@ -11,4 +14,7 @@ var Fwf = Provider{
 	},
 	Path:               "/tokens.v1.TokenService/ListTokens",
 	ExpectedStatusCode: 403,
+	TokenPatterns: []*regexp.Regexp{
+		regexp.MustCompile(`^pat_[A-Z2-7]{26}$`),
+	},
 }
